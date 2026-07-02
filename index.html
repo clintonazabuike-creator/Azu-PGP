@@ -3,171 +3,334 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PGP Vault</title>
+    <title>PGP Vault Suite</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js" defer></script>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen font-sans antialiased p-4 pb-12">
 
-    <header class="max-w-md mx-auto flex justify-between items-center mb-6 border-b border-gray-800 pb-3">
+    <header class="max-w-md mx-auto mb-4 border-b border-gray-800 pb-3 flex justify-between items-center">
         <div>
-            <h1 class="text-xl font-bold tracking-wider text-emerald-400">🔑 PGP VAULT</h1>
-            <p id="key-count" class="text-xs text-gray-500">0 keys loaded locally</p>
+            <h1 class="text-xl font-bold tracking-wider text-emerald-400">🔑 PGP SUITE</h1>
+            <p id="key-count" class="text-xs text-gray-500">0 keys in database</p>
         </div>
+        <button onclick="wipeAllData()" class="text-xs bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-400 px-2 py-1 rounded">Wipe App</button>
     </header>
 
-    <main class="max-w-md mx-auto space-y-6">
+    <main class="max-w-md mx-auto space-y-4">
         
-        <section class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
-            <h2 class="text-sm font-semibold tracking-wide text-gray-400 mb-3">INPUT TERMINAL</h2>
-            
-            <textarea id="main-input" rows="10" 
-                class="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-xs text-emerald-500 focus:outline-none focus:border-emerald-500 transition-colors placeholder-gray-700"
-                placeholder="Paste an Armored Public Key OR a -----BEGIN PGP SIGNED MESSAGE----- block here..."></textarea>
-            
-            <div class="grid grid-cols-2 gap-3 mt-3">
-                <button onclick="processInput()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 px-4 rounded-lg text-sm transition-colors cursor-pointer">
-                    Process Input
-                </button>
-                <button onclick="clearInput()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2 px-4 rounded-lg text-sm transition-colors cursor-pointer">
-                    Clear Input
-                </button>
+        <nav class="grid grid-cols-4 gap-1 bg-gray-900 p-1 border border-gray-800 rounded-lg text-xs font-semibold">
+            <button onclick="switchTab('tab-verify')" id="btn-tab-verify" class="py-2 text-center rounded bg-emerald-600 text-gray-950 font-bold transition-all cursor-pointer">Verify</button>
+            <button onclick="switchTab('tab-encrypt')" id="btn-tab-encrypt" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Encrypt</button>
+            <button onclick="switchTab('tab-decrypt')" id="btn-tab-decrypt" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Decrypt</button>
+            <button onclick="switchTab('tab-keys')" id="btn-tab-keys" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Keys</button>
+        </nav>
+
+        <section id="alert-box" class="hidden p-3 rounded-lg font-mono text-xs font-bold border break-words"></section>
+
+        <section id="tab-verify" class="tab-content space-y-3">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400 mb-2">VERIFY CLEARTEXT SIGNATURE</h2>
+                <textarea id="verify-input" rows="8" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-emerald-500 focus:outline-none placeholder-gray-700" placeholder="Paste -----BEGIN PGP SIGNED MESSAGE----- block..."></textarea>
+                <button onclick="handleVerify()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Run Signature Verification</button>
+            </div>
+            <div id="verify-result-box" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <label class="text-[10px] text-gray-500 block mb-1 font-mono">EXTRACTED CLEAN TEXT:</label>
+                <div id="verify-output-text" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-300 whitespace-pre-wrap break-words"></div>
             </div>
         </section>
 
-        <section id="output-panel" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
-            <h2 class="text-sm font-semibold tracking-wide text-gray-400 mb-3">OUTPUT LOG</h2>
-            
-            <div id="status-badge" class="mb-3 p-3 rounded-lg font-mono text-xs font-bold border"></div>
-            
-            <div id="decrypted-box" class="hidden">
-                <label class="text-xs text-gray-500 block mb-1 font-mono">EXTRACTED TEXT:</label>
-                <div id="output-text" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-xs text-gray-300 break-words whitespace-pre-wrap"></div>
+        <section id="tab-encrypt" class="tab-content hidden space-y-3">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl space-y-3">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400">ENCRYPT MESSAGE</h2>
+                <div>
+                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">RECIPIENT PUBLIC KEY:</label>
+                    <select id="encrypt-key-select" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none"></select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">RAW PLAINTEXT MESSAGE:</label>
+                    <textarea id="encrypt-message-input" rows="5" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-emerald-500 focus:outline-none placeholder-gray-700" placeholder="Type secret message here..."></textarea>
+                </div>
+                <button onclick="handleEncrypt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Encrypt & Armor Text</button>
+            </div>
+            <div id="encrypt-result-box" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <label class="text-[10px] text-gray-500 block mb-1 font-mono">ARMORED CIPHERTEXT:</label>
+                <textarea id="encrypt-output-text" rows="8" readonly class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-400 focus:outline-none select-all"></textarea>
+            </div>
+        </section>
+
+        <section id="tab-decrypt" class="tab-content hidden space-y-3">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl space-y-3">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400">DECRYPT MESSAGE</h2>
+                <textarea id="decrypt-input" rows="6" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-emerald-500 focus:outline-none placeholder-gray-700" placeholder="Paste encrypted -----BEGIN PGP MESSAGE----- block here..."></textarea>
+                <div>
+                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">YOUR DECRYPTION PRIVATE KEY PASSPHRASE:</label>
+                    <input type="password" id="decrypt-passphrase" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none" placeholder="Enter key password if set">
+                </div>
+                <button onclick="handleDecrypt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Decrypt Payload</button>
+            </div>
+            <div id="decrypt-result-box" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-4">
+                <label class="text-[10px] text-gray-500 block mb-1 font-mono">DECRYPTED PLAINTEXT:</label>
+                <div id="decrypt-output-text" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-200 whitespace-pre-wrap break-words"></div>
+            </div>
+        </section>
+
+        <section id="tab-keys" class="tab-content hidden space-y-4">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl space-y-3">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400">GENERATE NEW KEY PAIR</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="text-[10px] text-gray-500 block mb-1 font-mono">NAME / ID:</label>
+                        <input type="text" id="gen-name" value="Anon User" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 block mb-1 font-mono">PASSPHRASE (OPTIONAL):</label>
+                        <input type="password" id="gen-pass" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none" placeholder="None">
+                    </div>
+                </div>
+                <button onclick="generateKeyPair()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Generate RSA 2048-bit Key Pair</button>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl space-y-2">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400">IMPORT EXTERNAL KEYS</h2>
+                <textarea id="key-import-input" rows="4" class="w-full bg-gray-950 border border-gray-800 rounded-lg p-2 font-mono text-xs text-emerald-500 focus:outline-none placeholder-gray-700" placeholder="Paste any standard Armored Public or Private Key block..."></textarea>
+                <button onclick="importKey()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer">Parse & Import Key</button>
+            </div>
+
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
+                <h2 class="text-xs font-semibold tracking-wide text-gray-400 mb-3">LOCAL STORAGE KEYRING</h2>
+                <div id="keyring-list" class="space-y-3 divide-y divide-gray-800"></div>
             </div>
         </section>
 
     </main>
 
     <script>
-        // Local state initialization pulling keys from phone's browser cache
-        let keyRing = JSON.parse(localStorage.getItem('pgp_vault_keys')) || {};
+        // Database Schemas for Key Storage
+        let db = JSON.parse(localStorage.getItem('pgp_suite_db')) || { publicKeys: {}, privateKeys: {} };
 
-        function updateKeyCount() {
-            const count = Object.keys(keyRing).length;
-            document.getElementById('key-count').innerText = `${count} key(s) loaded locally`;
+        // Helper: safe engine validation checking loading errors
+        function getEngine() {
+            if (typeof openpgp === 'undefined') {
+                throw new Error("Cryptographic engine initialization delayed. Please refresh or verify network access.");
+            }
+            return openpgp;
         }
 
-        function clearInput() {
-            document.getElementById('main-input').value = '';
-            document.getElementById('output-panel').classList.add('hidden');
-        }
-
-        function showStatus(type, message, bodyText = '') {
-            const panel = document.getElementById('output-panel');
-            const badge = document.getElementById('status-badge');
-            const decryptBox = document.getElementById('decrypted-box');
-            const outputText = document.getElementById('output-text');
-
-            panel.classList.remove('hidden');
-            decryptBox.classList.add('hidden');
-
+        function showAlert(type, text) {
+            const el = document.getElementById('alert-box');
+            el.classList.remove('hidden', 'bg-emerald-950', 'border-emerald-700', 'text-emerald-400', 'bg-red-950', 'border-red-700', 'text-red-400');
             if (type === 'success') {
-                badge.className = "mb-3 p-3 rounded-lg font-mono text-xs font-bold bg-emerald-950 border-emerald-700 text-emerald-400 border";
-                badge.innerText = `🟢 SUCCESS: ${message}`;
-                if(bodyText) {
-                    decryptBox.classList.remove('hidden');
-                    outputText.innerText = bodyText;
-                }
-            } else if (type === 'info') {
-                badge.className = "mb-3 p-3 rounded-lg font-mono text-xs font-bold bg-blue-950 border-blue-700 text-blue-400 border";
-                badge.innerText = `ℹ️ INFO: ${message}`;
+                el.className = "p-3 rounded-lg font-mono text-xs font-bold border break-words bg-emerald-950 border-emerald-700 text-emerald-400";
+                el.innerText = `🟢 ${text}`;
             } else {
-                badge.className = "mb-3 p-3 rounded-lg font-mono text-xs font-bold bg-red-950 border-red-700 text-red-400 border";
-                badge.innerText = `🔴 ERROR: ${message}`;
+                el.className = "p-3 rounded-lg font-mono text-xs font-bold border break-words bg-red-950 border-red-700 text-red-400";
+                el.innerText = `🔴 ${text}`;
             }
+            window.scrollTo({top: 0, behavior: 'smooth'});
         }
 
-        async function processInput() {
-            const input = document.getElementById('main-input').value.trim();
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
             
-            if (!input) {
-                showStatus('error', 'Input is empty.');
-                return;
-            }
-
-            // Route 1: Public Key Detection
-            if (input.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
-                try {
-                    const readKey = await openpgp.readKey({ armoredKey: input });
-                    const keyID = readKey.getKeyID().toHex().toUpperCase();
-                    
-                    // Simple input prompt for mobile label assignment
-                    const name = prompt(`Enter a nickname for Key ID: 0x${keyID}`, "Market/Vendor Key") || `Key_${keyID.substring(0,6)}`;
-                    
-                    keyRing[keyID] = { armoredKey: input, label: name };
-                    localStorage.setItem('pgp_vault_keys', JSON.stringify(keyRing));
-                    
-                    updateKeyCount();
-                    showStatus('success', `Saved Public Key: "${name}" (0x${keyID})`);
-                } catch (err) {
-                    showStatus('error', `Failed to parse public key: ${err.message}`);
-                }
-                return;
-            }
-
-            // Route 2: Signed Cleartext Message Detection
-            if (input.includes('-----BEGIN PGP SIGNED MESSAGE-----')) {
-                try {
-                    const cleartextMessage = await openpgp.readCleartextMessage({ cleartextMessage: input });
-                    const signingKeyIDs = cleartextMessage.getSigningKeyIDs().map(id => id.toHex().toUpperCase());
-                    
-                    let verificationKey = null;
-                    let matchedLabel = "Unknown Signer";
-                    
-                    // Query local database for signing signature match
-                    for (const id of signingKeyIDs) {
-                        if (keyRing[id]) {
-                            verificationKey = await openpgp.readKey({ armoredKey: keyRing[id].armoredKey });
-                            matchedLabel = keyRing[id].label;
-                            break;
-                        }
-                    }
-
-                    if (!verificationKey) {
-                        showStatus('error', `Missing verification key. Message was signed by Key ID: 0x${signingKeyIDs[0] || 'Unknown'}. Please import their Public Key first.`);
-                        return;
-                    }
-
-                    const verificationResult = await openpgp.verify({
-                        message: cleartextMessage,
-                        verificationKeys: verificationKey
-                    });
-
-                    const { verified } = verificationResult.signatures[0];
-                    await verified; // Throws error if signature does not compute mathematically
-
-                    showStatus('success', `Valid Signature from "${matchedLabel}"`, cleartextMessage.getText());
-                } catch (err) {
-                    showStatus('error', `Verification failed: ${err.message}`);
-                }
-                return;
-            }
-
-            showStatus('error', 'Unrecognized PGP block format. Ensure you pasted the headers.');
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.className = "py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer";
+            });
+            document.getElementById(`btn-${tabId}`).className = "py-2 text-center rounded bg-emerald-600 text-gray-950 font-bold transition-all cursor-pointer";
+            document.getElementById('alert-box').classList.add('hidden');
+            
+            if (tabId === 'tab-encrypt') populateEncryptDropdown();
+            if (tabId === 'tab-keys') renderKeyringList();
         }
 
-        // Initialize display state on initial load
-        updateKeyCount();
+        function syncDB() {
+            localStorage.setItem('pgp_suite_db', JSON.stringify(db));
+            const publicCount = Object.keys(db.publicKeys).length;
+            const privateCount = Object.keys(db.privateKeys).length;
+            document.getElementById('key-count').innerText = `${publicCount} Public | ${privateCount} Private Keys`;
+        }
 
-        // Register Service Worker for offline PWA installation
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registered successfully.'))
-                    .catch(err => console.log('Service Worker registration failed:', err));
+        // ================= CRYPTO OPS =================
+
+        async function generateKeyPair() {
+            try {
+                const openpgpEngine = getEngine();
+                showAlert('success', 'Generating key pair securely (this can take seconds on old devices)...');
+                
+                const name = document.getElementById('gen-name').value || 'Anon';
+                const passphrase = document.getElementById('gen-pass').value || undefined;
+
+                const { privateKey, publicKey } = await openpgpEngine.generateKey({
+                    type: 'rsa',
+                    rsaBits: 2048,
+                    userIDs: [{ name: name }],
+                    passphrase: passphrase
+                });
+
+                const parsedPubKey = await openpgpEngine.readKey({ armoredKey: publicKey });
+                const keyID = parsedPubKey.getKeyID().toHex().toUpperCase();
+
+                db.publicKeys[keyID] = { armored: publicKey, label: `${name} (Public)` };
+                db.privateKeys[keyID] = { armored: privateKey, label: `${name} (Private)` };
+                
+                syncDB();
+                switchTab('tab-keys');
+                showAlert('success', `Generated & Saved Key Pair ID: 0x${keyID}`);
+            } catch(e) {
+                showAlert('error', e.message);
+            }
+        }
+
+        async function importKey() {
+            try {
+                const openpgpEngine = getEngine();
+                const raw = document.getElementById('key-import-input').value.trim();
+                if (!raw) return showAlert('error', 'Paste data first');
+
+                if (raw.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
+                    const key = await openpgpEngine.readKey({ armoredKey: raw });
+                    const id = key.getKeyID().toHex().toUpperCase();
+                    const name = prompt("Enter a label for this public key:", "Imported Contact Key") || id;
+                    db.publicKeys[id] = { armored: raw, label: name };
+                    showAlert('success', `Imported Public Key: 0x${id}`);
+                } else if (raw.includes('-----BEGIN PGP PRIVATE KEY BLOCK-----')) {
+                    const key = await openpgpEngine.readPrivateKey({ armoredKey: raw });
+                    const id = key.getKeyID().toHex().toUpperCase();
+                    const name = prompt("Enter a label for this private key:", "My Personal Key") || id;
+                    db.privateKeys[id] = { armored: raw, label: name };
+                    showAlert('success', `Imported Private Key: 0x${id}`);
+                } else {
+                    return showAlert('error', 'Unrecognized key armor markers.');
+                }
+                document.getElementById('key-import-input').value = '';
+                syncDB();
+                renderKeyringList();
+            } catch(e) {
+                showAlert('error', `Import Error: ${e.message}`);
+            }
+        }
+
+        async function handleVerify() {
+            try {
+                const openpgpEngine = getEngine();
+                const input = document.getElementById('verify-input').value.trim();
+                const resultBox = document.getElementById('verify-result-box');
+                resultBox.classList.add('hidden');
+
+                if(!input.includes('-----BEGIN PGP SIGNED MESSAGE-----')) {
+                    return showAlert('error', 'Not a cleartext signed message block.');
+                }
+
+                const cleartextMessage = await openpgpEngine.readCleartextMessage({ cleartextMessage: input });
+                const signers = cleartextMessage.getSigningKeyIDs().map(id => id.toHex().toUpperCase());
+                
+                let pubKeyObj = null;
+                let signerLabel = "Unknown Identity";
+                for (let id of signers) {
+                    if (db.publicKeys[id]) {
+                        pubKeyObj = await openpgpEngine.readKey({ armoredKey: db.publicKeys[id].armored });
+                        signerLabel = db.publicKeys[id].label;
+                        break;
+                    }
+                }
+
+                if (!pubKeyObj) {
+                    return showAlert('error', `Signed by Key ID: 0x${signers[0] || 'Unknown'}. You must import their Public Key first to complete validation.`);
+                }
+
+                const verificationResult = await openpgpEngine.verify({
+                    message: cleartextMessage,
+                    verificationKeys: pubKeyObj
+                });
+
+                await verificationResult.signatures[0].verified;
+                showAlert('success', `Signature Verified mathematically from "${signerLabel}"`);
+                resultBox.classList.remove('hidden');
+                document.getElementById('verify-output-text').innerText = cleartextMessage.getText();
+            } catch(e) {
+                showAlert('error', `Verification Rejected: ${e.message}`);
+            }
+        }
+
+        async function handleEncrypt() {
+            try {
+                const openpgpEngine = getEngine();
+                const keyID = document.getElementById('encrypt-key-select').value;
+                const text = document.getElementById('encrypt-message-input').value.trim();
+                const resBox = document.getElementById('encrypt-result-box');
+                resBox.classList.add('hidden');
+
+                if (!keyID || !text) return showAlert('error', 'Select target key and ensure message isn\'t blank');
+
+                const pubKey = await openpgpEngine.readKey({ armoredKey: db.publicKeys[keyID].armored });
+                const encrypted = await openpgpEngine.encrypt({
+                    message: await openpgpEngine.createMessage({ text: text }),
+                    encryptionKeys: pubKey
+                });
+
+                resBox.classList.remove('hidden');
+                document.getElementById('encrypt-output-text').value = encrypted;
+                showAlert('success', 'Ciphertext generated successfully');
+            } catch(e) {
+                showAlert('error', e.message);
+            }
+        }
+
+        async function handleDecrypt() {
+            try {
+                const openpgpEngine = getEngine();
+                const input = document.getElementById('decrypt-input').value.trim();
+                const pass = document.getElementById('decrypt-passphrase').value;
+                const resBox = document.getElementById('decrypt-result-box');
+                resBox.classList.add('hidden');
+
+                if (!input.includes('-----BEGIN PGP MESSAGE-----')) return showAlert('error', 'Invalid encrypted payload block format');
+
+                const message = await openpgpEngine.readMessage({ armoredMessage: input });
+                const encryptionIds = message.getEncryptionKeyIDs().map(id => id.toHex().toUpperCase());
+
+                let privateKeyObj = null;
+                for (let id of encryptionIds) {
+                    if (db.privateKeys[id]) {
+                        privateKeyObj = await openpgpEngine.readPrivateKey({ armoredKey: db.privateKeys[id].armored });
+                        break;
+                    }
+                }
+
+                if (!privateKeyObj) return showAlert('error', 'Matching Decryption Private Key not found in local keyring database.');
+
+                if (privateKeyObj.isEncrypted()) {
+                    privateKeyObj = await openpgpEngine.decryptKey({ privateKey: privateKeyObj, passphrase: pass });
+                }
+
+                const { data: decrypted } = await openpgpEngine.decrypt({
+                    message,
+                    decryptionKeys: privateKeyObj
+                });
+
+                resBox.classList.remove('hidden');
+                document.getElementById('decrypt-output-text').innerText = decrypted;
+                showAlert('success', 'Payload decrypted safely client-side');
+            } catch(e) {
+                showAlert('error', `Decryption Failed: ${e.message}`);
+            }
+        }
+
+        // ================= DOM INTERACTION =================
+
+        function populateEncryptDropdown() {
+            const select = document.getElementById('encrypt-key-select');
+            select.innerHTML = '';
+            Object.keys(db.publicKeys).forEach(id => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.innerText = `${db.publicKeys[id].label} [0x${id.substring(0,8)}]`;
+                select.appendChild(opt);
             });
         }
-    </script>
-</body>
-</html>
+
+        function renderKeyringList() {
+            const container = document.getElementById('keyring-list');
+   
