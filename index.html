@@ -6,16 +6,16 @@
     <title>PGP Vault Suite</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen font-sans antialiased p-4 pb-12">
 
     <header class="max-w-md mx-auto mb-4 border-b border-gray-800 pb-3 flex justify-between items-center">
         <div>
             <h1 class="text-xl font-bold tracking-wider text-emerald-400">🔑 PGP SUITE</h1>
-            <p id="key-count" class="text-xs text-gray-500">0 keys in database</p>
+            <p id="key-count" class="text-xs text-gray-500">0 Public | 0 Private Keys</p>
         </div>
-        <button onclick="wipeAllData()" class="text-xs bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-400 px-2 py-1 rounded">Wipe App</button>
+        <button onclick="wipeAllData()" class="text-xs bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-400 px-2 py-1 rounded cursor-pointer">Wipe App</button>
     </header>
 
     <main class="max-w-md mx-auto space-y-4">
@@ -107,15 +107,19 @@
     </main>
 
     <script>
-        // Database Schemas for Key Storage
-        let db = JSON.parse(localStorage.getItem('pgp_suite_db')) || { publicKeys: {}, privateKeys: {} };
-
-        // Helper: safe engine validation checking loading errors
-        function getEngine() {
-            if (typeof openpgp === 'undefined') {
-                throw new Error("Cryptographic engine initialization delayed. Please refresh or verify network access.");
+        // Clean database migration patch handling format changes safely
+        let rawDB = localStorage.getItem('pgp_suite_db');
+        let db = { publicKeys: {}, privateKeys: {} };
+        
+        try {
+            if (rawDB) {
+                let parsed = JSON.parse(rawDB);
+                if (parsed && parsed.publicKeys && parsed.privateKeys) {
+                    db = parsed;
+                }
             }
-            return openpgp;
+        } catch(e) {
+            console.error("DB Initialization Reset required", e);
         }
 
         function showAlert(type, text) {
@@ -156,20 +160,19 @@
 
         async function generateKeyPair() {
             try {
-                const openpgpEngine = getEngine();
-                showAlert('success', 'Generating key pair securely (this can take seconds on old devices)...');
+                showAlert('success', 'Generating key pair securely (this can take seconds)...');
                 
                 const name = document.getElementById('gen-name').value || 'Anon';
                 const passphrase = document.getElementById('gen-pass').value || undefined;
 
-                const { privateKey, publicKey } = await openpgpEngine.generateKey({
+                const { privateKey, publicKey } = await openpgp.generateKey({
                     type: 'rsa',
                     rsaBits: 2048,
                     userIDs: [{ name: name }],
                     passphrase: passphrase
                 });
 
-                const parsedPubKey = await openpgpEngine.readKey({ armoredKey: publicKey });
+                const parsedPubKey = await openpgp.readKey({ armoredKey: publicKey });
                 const keyID = parsedPubKey.getKeyID().toHex().toUpperCase();
 
                 db.publicKeys[keyID] = { armored: publicKey, label: `${name} (Public)` };
@@ -185,18 +188,17 @@
 
         async function importKey() {
             try {
-                const openpgpEngine = getEngine();
                 const raw = document.getElementById('key-import-input').value.trim();
                 if (!raw) return showAlert('error', 'Paste data first');
 
                 if (raw.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
-                    const key = await openpgpEngine.readKey({ armoredKey: raw });
+                    const key = await openpgp.readKey({ armoredKey: raw });
                     const id = key.getKeyID().toHex().toUpperCase();
                     const name = prompt("Enter a label for this public key:", "Imported Contact Key") || id;
                     db.publicKeys[id] = { armored: raw, label: name };
                     showAlert('success', `Imported Public Key: 0x${id}`);
                 } else if (raw.includes('-----BEGIN PGP PRIVATE KEY BLOCK-----')) {
-                    const key = await openpgpEngine.readPrivateKey({ armoredKey: raw });
+                    const key = await openpgp.readPrivateKey({ armoredKey: raw });
                     const id = key.getKeyID().toHex().toUpperCase();
                     const name = prompt("Enter a label for this private key:", "My Personal Key") || id;
                     db.privateKeys[id] = { armored: raw, label: name };
@@ -214,7 +216,6 @@
 
         async function handleVerify() {
             try {
-                const openpgpEngine = getEngine();
                 const input = document.getElementById('verify-input').value.trim();
                 const resultBox = document.getElementById('verify-result-box');
                 resultBox.classList.add('hidden');
@@ -223,30 +224,30 @@
                     return showAlert('error', 'Not a cleartext signed message block.');
                 }
 
-                const cleartextMessage = await openpgpEngine.readCleartextMessage({ cleartextMessage: input });
+                const cleartextMessage = await openpgp.readCleartextMessage({ cleartextMessage: input });
                 const signers = cleartextMessage.getSigningKeyIDs().map(id => id.toHex().toUpperCase());
                 
                 let pubKeyObj = null;
                 let signerLabel = "Unknown Identity";
                 for (let id of signers) {
                     if (db.publicKeys[id]) {
-                        pubKeyObj = await openpgpEngine.readKey({ armoredKey: db.publicKeys[id].armored });
+                        pubKeyObj = await openpgp.readKey({ armoredKey: db.publicKeys[id].armored });
                         signerLabel = db.publicKeys[id].label;
                         break;
                     }
                 }
 
                 if (!pubKeyObj) {
-                    return showAlert('error', `Signed by Key ID: 0x${signers[0] || 'Unknown'}. You must import their Public Key first to complete validation.`);
+                    return showAlert('error', `Signed by Key ID: 0x${signers[0] || 'Unknown'}. You must import their Public Key first.`);
                 }
 
-                const verificationResult = await openpgpEngine.verify({
+                const verificationResult = await openpgp.verify({
                     message: cleartextMessage,
                     verificationKeys: pubKeyObj
                 });
 
                 await verificationResult.signatures[0].verified;
-                showAlert('success', `Signature Verified mathematically from "${signerLabel}"`);
+                showAlert('success', `Signature Verified from "${signerLabel}"`);
                 resultBox.classList.remove('hidden');
                 document.getElementById('verify-output-text').innerText = cleartextMessage.getText();
             } catch(e) {
@@ -256,7 +257,6 @@
 
         async function handleEncrypt() {
             try {
-                const openpgpEngine = getEngine();
                 const keyID = document.getElementById('encrypt-key-select').value;
                 const text = document.getElementById('encrypt-message-input').value.trim();
                 const resBox = document.getElementById('encrypt-result-box');
@@ -264,9 +264,9 @@
 
                 if (!keyID || !text) return showAlert('error', 'Select target key and ensure message isn\'t blank');
 
-                const pubKey = await openpgpEngine.readKey({ armoredKey: db.publicKeys[keyID].armored });
-                const encrypted = await openpgpEngine.encrypt({
-                    message: await openpgpEngine.createMessage({ text: text }),
+                const pubKey = await openpgp.readKey({ armoredKey: db.publicKeys[keyID].armored });
+                const encrypted = await openpgp.encrypt({
+                    message: await openpgp.createMessage({ text: text }),
                     encryptionKeys: pubKey
                 });
 
@@ -280,39 +280,38 @@
 
         async function handleDecrypt() {
             try {
-                const openpgpEngine = getEngine();
                 const input = document.getElementById('decrypt-input').value.trim();
                 const pass = document.getElementById('decrypt-passphrase').value;
                 const resBox = document.getElementById('decrypt-result-box');
                 resBox.classList.add('hidden');
 
-                if (!input.includes('-----BEGIN PGP MESSAGE-----')) return showAlert('error', 'Invalid encrypted payload block format');
+                if (!input.includes('-----BEGIN PGP MESSAGE-----')) return showAlert('error', 'Invalid encrypted payload format');
 
-                const message = await openpgpEngine.readMessage({ armoredMessage: input });
+                const message = await openpgp.readMessage({ armoredMessage: input });
                 const encryptionIds = message.getEncryptionKeyIDs().map(id => id.toHex().toUpperCase());
 
                 let privateKeyObj = null;
                 for (let id of encryptionIds) {
                     if (db.privateKeys[id]) {
-                        privateKeyObj = await openpgpEngine.readPrivateKey({ armoredKey: db.privateKeys[id].armored });
+                        privateKeyObj = await openpgp.readPrivateKey({ armoredKey: db.privateKeys[id].armored });
                         break;
                     }
                 }
 
-                if (!privateKeyObj) return showAlert('error', 'Matching Decryption Private Key not found in local keyring database.');
+                if (!privateKeyObj) return showAlert('error', 'Matching Private Key not found.');
 
                 if (privateKeyObj.isEncrypted()) {
-                    privateKeyObj = await openpgpEngine.decryptKey({ privateKey: privateKeyObj, passphrase: pass });
+                    privateKeyObj = await openpgp.decryptKey({ privateKey: privateKeyObj, passphrase: pass });
                 }
 
-                const { data: decrypted } = await openpgpEngine.decrypt({
+                const { data: decrypted } = await openpgp.decrypt({
                     message,
                     decryptionKeys: privateKeyObj
                 });
 
                 resBox.classList.remove('hidden');
                 document.getElementById('decrypt-output-text').innerText = decrypted;
-                showAlert('success', 'Payload decrypted safely client-side');
+                showAlert('success', 'Payload decrypted safely');
             } catch(e) {
                 showAlert('error', `Decryption Failed: ${e.message}`);
             }
@@ -333,4 +332,12 @@
 
         function renderKeyringList() {
             const container = document.getElementById('keyring-list');
-   
+            container.innerHTML = '';
+            
+            const renderRows = (collection, typeStr) => {
+                Object.keys(collection).forEach(id => {
+                    const row = document.createElement('div');
+                    row.className = "pt-2 pb-1 text-xs flex justify-between items-start";
+                    row.innerHTML = `
+                        <div>
+    
