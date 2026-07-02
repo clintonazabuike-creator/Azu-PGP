@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PGP Vault</title>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
 </head>
@@ -14,9 +15,6 @@
             <h1 class="text-xl font-bold tracking-wider text-emerald-400">🔑 PGP VAULT</h1>
             <p id="key-count" class="text-xs text-gray-500">0 keys loaded locally</p>
         </div>
-        <button onclick="panicPurge()" class="px-3 py-1 bg-red-950 hover:bg-red-900 border border-red-700 text-red-400 text-xs font-mono rounded transition-all">
-            PANIC PURGE
-        </button>
     </header>
 
     <main class="max-w-md mx-auto space-y-6">
@@ -24,7 +22,7 @@
         <section class="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 class="text-sm font-semibold tracking-wide text-gray-400 mb-3">INPUT TERMINAL</h2>
             
-            <textarea id="main-input" rows="8" 
+            <textarea id="main-input" rows="10" 
                 class="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 font-mono text-xs text-emerald-500 focus:outline-none focus:border-emerald-500 transition-colors placeholder-gray-700"
                 placeholder="Paste an Armored Public Key OR a -----BEGIN PGP SIGNED MESSAGE----- block here..."></textarea>
             
@@ -32,7 +30,7 @@
                 <button onclick="processInput()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-gray-950 font-bold py-2 px-4 rounded-lg text-sm transition-colors cursor-pointer">
                     Process Input
                 </button>
-                <button onclick="clearInput()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2 px-4 rounded-lg text-sm transition-colors">
+                <button onclick="clearInput()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2 px-4 rounded-lg text-sm transition-colors cursor-pointer">
                     Clear Input
                 </button>
             </div>
@@ -52,7 +50,7 @@
     </main>
 
     <script>
-        // Store public keys locally in an object mapping keyID -> armoredKey
+        // Local state initialization pulling keys from phone's browser cache
         let keyRing = JSON.parse(localStorage.getItem('pgp_vault_keys')) || {};
 
         function updateKeyCount() {
@@ -98,13 +96,13 @@
                 return;
             }
 
-            // 1. Route: Is it a Public Key?
+            // Route 1: Public Key Detection
             if (input.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----')) {
                 try {
                     const readKey = await openpgp.readKey({ armoredKey: input });
                     const keyID = readKey.getKeyID().toHex().toUpperCase();
                     
-                    // Ask user for a label to identify this key easily later
+                    // Simple input prompt for mobile label assignment
                     const name = prompt(`Enter a nickname for Key ID: 0x${keyID}`, "Market/Vendor Key") || `Key_${keyID.substring(0,6)}`;
                     
                     keyRing[keyID] = { armoredKey: input, label: name };
@@ -118,16 +116,16 @@
                 return;
             }
 
-            // 2. Route: Is it a Signed Message?
+            // Route 2: Signed Cleartext Message Detection
             if (input.includes('-----BEGIN PGP SIGNED MESSAGE-----')) {
                 try {
                     const cleartextMessage = await openpgp.readCleartextMessage({ cleartextMessage: input });
                     const signingKeyIDs = cleartextMessage.getSigningKeyIDs().map(id => id.toHex().toUpperCase());
                     
-                    // Find a matching key in our local database
                     let verificationKey = null;
                     let matchedLabel = "Unknown Signer";
                     
+                    // Query local database for signing signature match
                     for (const id of signingKeyIDs) {
                         if (keyRing[id]) {
                             verificationKey = await openpgp.readKey({ armoredKey: keyRing[id].armoredKey });
@@ -147,7 +145,7 @@
                     });
 
                     const { verified } = verificationResult.signatures[0];
-                    await verified; // This will reject if the signature checks out mathematically invalid
+                    await verified; // Throws error if signature does not compute mathematically
 
                     showStatus('success', `Valid Signature from "${matchedLabel}"`, cleartextMessage.getText());
                 } catch (err) {
@@ -159,19 +157,8 @@
             showStatus('error', 'Unrecognized PGP block format. Ensure you pasted the headers.');
         }
 
-        function panicPurge() {
-            if (confirm("🚨 Wipe everything? This completely removes all stored keys from your phone's browser cache instantly.")) {
-                localStorage.clear();
-                keyRing = {};
-                updateKeyCount();
-                clearInput();
-                alert("Vault wiped clean.");
-            }
-        }
-
-        // Initialize state
+        // Initialize display state on initial load
         updateKeyCount();
     </script>
 </body>
 </html>
-  
