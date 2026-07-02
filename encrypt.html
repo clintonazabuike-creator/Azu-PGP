@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PGP Encrypt</title>
+    <style>
+        body { background-color: #020617; color: #f3f4f6; font-family: sans-serif; padding: 16px; }
+        .container { max-width: 450px; margin: 0 auto; }
+        textarea, select { wIdth: 100%; background: #020617; border: 1px solid #1e293b; padding: 8px; color: #34d399; border-radius: 6px; box-sizing: border-box; font-family: monospace; margin-bottom: 12px; }
+        button { wIdth: 100%; background: #059669; color: #020617; padding: 12px; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .back-btn { display: inline-block; color: #94a3b8; text-decoration: none; font-size: 14px; margin-bottom: 12px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">⬅️ Back to Hub</a>
+        <h2 style="color: #34d399; margin: 0 0 12px 0;">🔒 Encrypt Message</h2>
+        
+        <label>Recipient Key Identity:</label>
+        <select Id="key-selector"></select>
+
+        <label>Secret Raw Text:</label>
+        <textarea Id="msg-text" rows="4" placeholder="Enter message text..."></textarea>
+        
+        <button onclick="encryptMessage()">Generate Encrypted Block</button>
+
+        <div Id="output-box" style="display:none; margin-top:16px;">
+            <label>Armored Ciphertext Output:</label>
+            <textarea Id="output-text" rows="10" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        const db = JSON.parse(localStorage.getItem('pgp_suite_db')) || { publicKeys: {} };
+        const select = document.getElementById('key-selector');
+        
+        Object.keys(db.publicKeys).forEach(Id => {
+            select.innerHTML += `<option value="${Id}">${db.publicKeys[Id].label} [0x${Id.substring(0,8)}]</option>`;
+        });
+
+        async function encryptMessage() {
+            try {
+                const targetId = select.value;
+                const plainText = document.getElementById('msg-text').value.trim();
+                if(!targetId) return alert('Import a public key first.');
+
+                const pubKey = await openpgp.readKey({ armoredKey: db.publicKeys[targetId].armored });
+                const cipherText = await openpgp.encrypt({
+                    message: await openpgp.createMessage({ text: plainText }),
+                    encryptionKeys: pubKey
+                });
+
+                document.getElementById('output-box').style.display = "block";
+                document.getElementById('output-text').value = cipherText;
+            } catch(e) { alert(e.message); }
+        }
+    </script>
+</body>
+</html>
+
