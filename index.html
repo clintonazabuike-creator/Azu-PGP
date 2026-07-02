@@ -5,115 +5,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PGP Vault Suite</title>
     <link rel="manifest" href="manifest.json">
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { background-color: #020617; color: #f3f4f6; font-family: sans-serif; padding: 16px; margin: 0; }
+        .max-w-md { max-width: 28rem; margin-left: auto; margin-right: auto; }
+        .flex { display: flex; } .justify-between { justify-content: space-between; } .items-center { align-items: center; }
+        .grid { display: grid; } .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } .gap-1 { gap: 4px; }
+        .bg-slate-900 { background-color: #0f172a; } .border { border: 1px solid #1e293b; } .rounded-lg { border-radius: 8px; }
+        .p-1 { padding: 4px; } .py-2 { padding-top: 8px; padding-bottom: 8px; } .text-center { text-align: center; }
+        .bg-emerald-600 { background-color: #059669; } .text-slate-950 { color: #020617; } .font-bold { font-weight: 700; }
+        .hidden { display: none !important; } .space-y-4 > * + * { margin-top: 16px; } .space-y-3 > * + * { margin-top: 12px; }
+        .bg-slate-950 { background-color: #020617; } .w-full { width: 100%; } .p-2 { padding: 8px; } .rounded-xl { border-radius: 12px; }
+        .font-mono { font-family: monospace; } .text-xs { font-size: 12px; } .text-emerald-400 { color: #34d399; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/src/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
 </head>
-<body class="bg-slate-950 text-gray-100 min-h-screen font-sans antialiased p-4 pb-12">
+<body>
 
-    <header class="max-w-md mx-auto mb-4 border-b border-slate-800 pb-3 flex justify-between items-center">
+    <header class="max-w-md pb-3 mb-4 border-b border-slate-800 flex justify-between items-center">
         <div>
-            <h1 class="text-xl font-bold tracking-wider text-emerald-400">🔑 PGP SUITE</h1>
-            <p id="key-count" class="text-xs text-gray-500">Loading database...</p>
+            <h1 class="text-xl font-bold text-emerald-400" style="font-size: 20px; margin: 0;">🔑 PGP SUITE</h1>
+            <p id="key-count" class="text-xs" style="color: #64748b; margin: 4px 0 0 0;">Initializing App...</p>
         </div>
-        <button onclick="wipeAllData()" class="text-xs bg-red-950/40 hover:bg-red-950 border border-red-900 text-red-400 px-2 py-1 rounded cursor-pointer">Wipe App</button>
+        <button onclick="wipeAllData()" style="background-color: rgba(69, 10, 10, 0.4); border: 1px solid #7f1d1d; color: #f87171; font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Wipe App</button>
     </header>
 
-    <main class="max-w-md mx-auto space-y-4">
+    <main class="max-w-md space-y-4">
         
-        <nav class="grid grid-cols-4 gap-1 bg-slate-900 p-1 border border-slate-800 rounded-lg text-xs font-semibold">
-            <button onclick="switchTab('tab-verify')" id="btn-tab-verify" class="py-2 text-center rounded bg-emerald-600 text-slate-950 font-bold transition-all cursor-pointer">Verify</button>
-            <button onclick="switchTab('tab-encrypt')" id="btn-tab-encrypt" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Encrypt</button>
-            <button onclick="switchTab('tab-decrypt')" id="btn-tab-decrypt" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Decrypt</button>
-            <button onclick="switchTab('tab-keys')" id="btn-tab-keys" class="py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer">Keys</button>
+        <nav class="grid grid-cols-4 gap-1 bg-slate-900 p-1 border border-slate-800 rounded-lg text-xs" style="font-weight: 600;">
+            <button onclick="switchTab('tab-verify')" id="btn-tab-verify" class="py-2 text-center rounded bg-emerald-600 text-slate-950 font-bold cursor-pointer">Verify</button>
+            <button onclick="switchTab('tab-encrypt')" id="btn-tab-encrypt" class="py-2 text-center rounded style-inactive cursor-pointer" style="color: #94a3b8; border: none; background: transparent;">Encrypt</button>
+            <button onclick="switchTab('tab-decrypt')" id="btn-tab-decrypt" class="py-2 text-center rounded style-inactive cursor-pointer" style="color: #94a3b8; border: none; background: transparent;">Decrypt</button>
+            <button onclick="switchTab('tab-keys')" id="btn-tab-keys" class="py-2 text-center rounded style-inactive cursor-pointer" style="color: #94a3b8; border: none; background: transparent;">Keys</button>
         </nav>
 
-        <section id="alert-box" class="hidden p-3 rounded-lg font-mono text-xs font-bold border break-words"></section>
+        <section id="alert-box" class="hidden p-3 rounded-lg font-mono text-xs font-bold border" style="word-break: break-all;"></section>
 
         <section id="tab-verify" class="tab-content space-y-3">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400 mb-2">VERIFY CLEARTEXT SIGNATURE</h2>
-                <textarea id="verify-input" rows="8" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400 focus:outline-none placeholder-gray-700" placeholder="Paste -----BEGIN PGP SIGNED MESSAGE----- block..."></textarea>
-                <button onclick="handleVerify()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Run Signature Verification</button>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin-top: 0; margin-bottom: 8px;">VERIFY CLEARTEXT SIGNATURE</h2>
+                <textarea id="verify-input" rows="8" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400" style="outline: none;" placeholder="Paste -----BEGIN PGP SIGNED MESSAGE----- block..."></textarea>
+                <button onclick="handleVerify()" class="w-full mt-2 bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs cursor-pointer" style="border: none; margin-top: 8px;">Run Signature Verification</button>
             </div>
             <div id="verify-result-box" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <label class="text-[10px] text-gray-500 block mb-1 font-mono">EXTRACTED CLEAN TEXT:</label>
-                <div id="verify-output-text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300 whitespace-pre-wrap break-words"></div>
+                <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">EXTRACTED CLEAN TEXT:</label>
+                <div id="verify-output-text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300" style="white-space: pre-wrap; word-break: break-all;"></div>
             </div>
         </section>
 
         <section id="tab-encrypt" class="tab-content hidden space-y-3">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-3">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400">ENCRYPT MESSAGE</h2>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin: 0;">ENCRYPT MESSAGE</h2>
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">RECIPIENT PUBLIC KEY:</label>
-                    <select id="encrypt-key-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none"></select>
+                    <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">RECIPIENT PUBLIC KEY:</label>
+                    <select id="encrypt-key-select" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300" style="outline: none;"></select>
                 </div>
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">RAW PLAINTEXT MESSAGE:</label>
-                    <textarea id="encrypt-message-input" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400 focus:outline-none placeholder-gray-700" placeholder="Type secret message here..."></textarea>
+                    <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">RAW PLAINTEXT MESSAGE:</label>
+                    <textarea id="encrypt-message-input" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400" style="outline: none;" placeholder="Type secret message here..."></textarea>
                 </div>
-                <button onclick="handleEncrypt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Encrypt & Armor Text</button>
+                <button onclick="handleEncrypt()" class="w-full bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs cursor-pointer" style="border: none;">Encrypt & Armor Text</button>
             </div>
             <div id="encrypt-result-box" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <label class="text-[10px] text-gray-500 block mb-1 font-mono">ARMORED CIPHERTEXT:</label>
-                <textarea id="encrypt-output-text" rows="8" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-400 focus:outline-none select-all"></textarea>
+                <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">ARMORED CIPHERTEXT:</label>
+                <textarea id="encrypt-output-text" rows="8" readonly class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs" style="color: #94a3b8; outline: none;"></textarea>
             </div>
         </section>
 
         <section id="tab-decrypt" class="tab-content hidden space-y-3">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-3">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400">DECRYPT MESSAGE</h2>
-                <textarea id="decrypt-input" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400 focus:outline-none placeholder-gray-700" placeholder="Paste encrypted -----BEGIN PGP MESSAGE----- block here..."></textarea>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin: 0;">DECRYPT MESSAGE</h2>
+                <textarea id="decrypt-input" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400" style="outline: none;" placeholder="Paste encrypted -----BEGIN PGP MESSAGE----- block here..."></textarea>
                 <div>
-                    <label class="text-[10px] text-gray-500 block mb-1 font-mono">YOUR DECRYPTION PRIVATE KEY PASSPHRASE:</label>
-                    <input type="password" id="decrypt-passphrase" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none" placeholder="Enter key password if set">
+                    <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">YOUR DECRYPTION KEY PASSPHRASE:</label>
+                    <input type="password" id="decrypt-passphrase" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300" style="outline: none;" placeholder="Enter key password if set">
                 </div>
-                <button onclick="handleDecrypt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Decrypt Payload</button>
+                <button onclick="handleDecrypt()" class="w-full bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs cursor-pointer" style="border: none;">Decrypt Payload</button>
             </div>
             <div id="decrypt-result-box" class="hidden bg-slate-900 border border-slate-800 rounded-xl p-4">
-                <label class="text-[10px] text-gray-500 block mb-1 font-mono">DECRYPTED PLAINTEXT:</label>
-                <div id="decrypt-output-text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-200 whitespace-pre-wrap break-words"></div>
+                <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">DECRYPTED PLAINTEXT:</label>
+                <div id="decrypt-output-text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-200" style="white-space: pre-wrap; word-break: break-all;"></div>
             </div>
         </section>
 
         <section id="tab-keys" class="tab-content hidden space-y-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-3">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400">GENERATE NEW KEY PAIR</h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-[10px] text-gray-500 block mb-1 font-mono">NAME / ID:</label>
-                        <input type="text" id="gen-name" value="Anon User" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin: 0;">GENERATE NEW KEY PAIR</h2>
+                <div style="display: flex; gap: 8px;">
+                    <div style="flex: 1;">
+                        <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">NAME / ID:</label>
+                        <input type="text" id="gen-name" value="Anon User" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300" style="outline: none;">
                     </div>
-                    <div>
-                        <label class="text-[10px] text-gray-500 block mb-1 font-mono">PASSPHRASE (OPTIONAL):</label>
-                        <input type="password" id="gen-pass" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300 focus:outline-none" placeholder="None">
+                    <div style="flex: 1;">
+                        <label class="font-mono" style="font-size: 10px; color: #64748b; display: block; margin-bottom: 4px;">PASSPHRASE:</label>
+                        <input type="password" id="gen-pass" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-gray-300" style="outline: none;" placeholder="Optional">
                     </div>
                 </div>
-                <button onclick="generateKeyPair()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer">Generate RSA 2048-bit Key Pair</button>
+                <button onclick="generateKeyPair()" class="w-full bg-emerald-600 text-slate-950 font-bold py-2 rounded-lg text-xs cursor-pointer" style="border: none;">Generate RSA 2048-bit Key Pair</button>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl space-y-2">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400">IMPORT EXTERNAL KEYS</h2>
-                <textarea id="key-import-input" rows="4" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400 focus:outline-none placeholder-gray-700" placeholder="Paste any standard Armored Public or Private Key block..."></textarea>
-                <button onclick="importKey()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer">Parse & Import Key</button>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin: 0 0 4px 0;">IMPORT EXTERNAL KEYS</h2>
+                <textarea id="key-import-input" rows="4" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-xs text-emerald-400" style="outline: none;" placeholder="Paste any standard Armored Public or Private Key block..."></textarea>
+                <button onclick="importKey()" class="w-full bg-slate-800 text-gray-200 py-2 rounded-lg text-xs font-medium cursor-pointer" style="border: none; background-color: #1e293b;">Parse & Import Key</button>
             </div>
 
-            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
-                <h2 class="text-xs font-semibold tracking-wide text-gray-400 mb-3">LOCAL STORAGE KEYRING</h2>
-                <div id="keyring-list" class="space-y-3 divide-y divide-slate-800"></div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                <h2 class="text-xs font-semibold" style="color: #94a3b8; margin: 0 0 12px 0;">LOCAL STORAGE KEYRING</h2>
+                <div id="keyring-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
             </div>
         </section>
 
     </main>
 
     <script>
-        // Global variables initialization
         let db = { publicKeys: {}, privateKeys: {} };
 
-        // Safety checking execution engine state
         function checkEngine() {
             if (typeof openpgp === 'undefined') {
-                showAlert('error', 'Cryptographic engine (openpgp) is still not loaded. Please ensure you are connected to the network or disable aggressive script-blockers.');
+                showAlert('error', 'Cryptographic engine failed to load over CDN. Switch your browser connection or check network filters.');
                 return false;
             }
             return true;
@@ -121,12 +133,12 @@
 
         function showAlert(type, text) {
             const el = document.getElementById('alert-box');
-            el.classList.remove('hidden', 'bg-emerald-950', 'border-emerald-700', 'text-emerald-400', 'bg-red-950', 'border-red-700', 'text-red-400');
+            el.classList.remove('hidden');
             if (type === 'success') {
-                el.className = "p-3 rounded-lg font-mono text-xs font-bold border break-words bg-emerald-950 border-emerald-700 text-emerald-400";
+                el.style.backgroundColor = '#064e3b'; el.style.borderColor = '#047857'; el.style.color = '#34d399';
                 el.innerText = `🟢 ${text}`;
             } else {
-                el.className = "p-3 rounded-lg font-mono text-xs font-bold border break-words bg-red-950 border-red-700 text-red-400";
+                el.style.backgroundColor = '#4c0519'; el.style.borderColor = '#b91c1c'; el.style.color = '#f87171';
                 el.innerText = `🔴 ${text}`;
             }
         }
@@ -136,9 +148,17 @@
             document.getElementById(tabId).classList.remove('hidden');
             
             document.querySelectorAll('nav button').forEach(btn => {
-                btn.className = "py-2 text-center rounded text-gray-400 hover:text-white transition-all cursor-pointer";
+                btn.className = "py-2 text-center rounded cursor-pointer";
+                btn.style.backgroundColor = "transparent";
+                btn.style.color = "#94a3b8";
+                btn.style.fontWeight = "600";
             });
-            document.getElementById(`btn-${tabId}`).className = "py-2 text-center rounded bg-emerald-600 text-slate-950 font-bold transition-all cursor-pointer";
+            
+            const activeBtn = document.getElementById(`btn-${tabId}`);
+            activeBtn.style.backgroundColor = "#059669";
+            activeBtn.style.color = "#020617";
+            activeBtn.style.fontWeight = "700";
+            
             document.getElementById('alert-box').classList.add('hidden');
             
             if (tabId === 'tab-encrypt') populateEncryptDropdown();
@@ -146,19 +166,20 @@
         }
 
         function syncDB() {
-            localStorage.setItem('pgp_suite_db', JSON.stringify(db));
+            try {
+                localStorage.setItem('pgp_suite_db', JSON.stringify(db));
+            } catch(e) {
+                console.error("Storage save rejected", e);
+            }
             const publicCount = Object.keys(db.publicKeys).length;
             const privateCount = Object.keys(db.privateKeys).length;
             document.getElementById('key-count').innerText = `${publicCount} Public | ${privateCount} Private Keys`;
         }
 
-        // ================= CRYPTO OPERATIONS =================
-
         async function generateKeyPair() {
             if (!checkEngine()) return;
             try {
-                showAlert('success', 'Generating key pair securely (this can take a few seconds)...');
-                
+                showAlert('success', 'Generating key pair (takes a few seconds)...');
                 const name = document.getElementById('gen-name').value || 'Anon';
                 const passphrase = document.getElementById('gen-pass').value || undefined;
 
@@ -177,7 +198,7 @@
                 
                 syncDB();
                 switchTab('tab-keys');
-                showAlert('success', `Generated & Saved Key Pair ID: 0x${keyID}`);
+                showAlert('success', `Generated Key pair: 0x${keyID}`);
             } catch(e) {
                 showAlert('error', e.message);
             }
@@ -202,13 +223,13 @@
                     db.privateKeys[id] = { armored: raw, label: name };
                     showAlert('success', `Imported Private Key: 0x${id}`);
                 } else {
-                    return showAlert('error', 'Unrecognized key armor markers. To verify messages, go to the Keys tab first and import a public key block.');
+                    return showAlert('error', 'Unrecognized PGP armored key markers.');
                 }
                 document.getElementById('key-import-input').value = '';
                 syncDB();
                 renderKeyringList();
             } catch(e) {
-                showAlert('error', `Import Error: ${e.message}`);
+                showAlert('error', `Import Failed: ${e.message}`);
             }
         }
 
@@ -220,7 +241,7 @@
                 resultBox.classList.add('hidden');
 
                 if(!input.includes('-----BEGIN PGP SIGNED MESSAGE-----')) {
-                    return showAlert('error', 'This input field is for signed messages, not raw public keys. Paste a -----BEGIN PGP SIGNED MESSAGE----- block.');
+                    return showAlert('error', 'Paste an actual -----BEGIN PGP SIGNED MESSAGE----- block here.');
                 }
 
                 const cleartextMessage = await openpgp.readCleartextMessage({ cleartextMessage: input });
@@ -237,7 +258,7 @@
                 }
 
                 if (!pubKeyObj) {
-                    return showAlert('error', `Signed by Key ID: 0x${signers[0] || 'Unknown'}. You must switch to the "Keys" tab and import their Public Key block first.`);
+                    return showAlert('error', `Signed by Key ID: 0x${signers[0] || 'Unknown'}. Import their Public Key in the "Keys" tab first.`);
                 }
 
                 const verificationResult = await openpgp.verify({
@@ -262,7 +283,7 @@
                 const resBox = document.getElementById('encrypt-result-box');
                 resBox.classList.add('hidden');
 
-                if (!keyID || !text) return showAlert('error', 'Select a target key and ensure the message is not blank');
+                if (!keyID || !text) return showAlert('error', 'Select target key and write a message');
 
                 const pubKey = await openpgp.readKey({ armoredKey: db.publicKeys[keyID].armored });
                 const encrypted = await openpgp.encrypt({
@@ -299,39 +320,4 @@
                     }
                 }
 
-                if (!privateKeyObj) return showAlert('error', 'Matching Private Key not found.');
-
-                if (privateKeyObj.isEncrypted()) {
-                    privateKeyObj = await openpgp.decryptKey({ privateKey: privateKeyObj, passphrase: pass });
-                }
-
-                const { data: decrypted } = await openpgp.decrypt({
-                    message,
-                    decryptionKeys: privateKeyObj
-                });
-
-                resBox.classList.remove('hidden');
-                document.getElementById('decrypt-output-text').innerText = decrypted;
-                showAlert('success', 'Payload decrypted safely');
-            } catch(e) {
-                showAlert('error', `Decryption Failed: ${e.message}`);
-            }
-        }
-
-        // ================= UI RENDERING PROCEDURES =================
-
-        function populateEncryptDropdown() {
-            const select = document.getElementById('encrypt-key-select');
-            select.innerHTML = '';
-            Object.keys(db.publicKeys).forEach(id => {
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.innerText = `${db.publicKeys[id].label} [0x${id.substring(0,8)}]`;
-                select.appendChild(opt);
-            });
-        }
-
-        function renderKeyringList() {
-            const container = document.getElementById('keyring-list');
-            container.innerHTML = '';
-       
+                if 
