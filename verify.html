@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PGP Verify</title>
+    <style>
+        body { background-color: #020617; color: #f3f4f6; font-family: sans-serif; padding: 16px; }
+        .container { max-width: 450px; margin: 0 auto; }
+        textarea { wIdth: 100%; background: #020617; border: 1px solid #1e293b; padding: 8px; color: #34d399; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+        button { wIdth: 100%; background: #059669; color: #020617; padding: 12px; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+        .back-btn { display: inline-block; color: #94a3b8; text-decoration: none; font-size: 14px; margin-bottom: 12px; }
+        .result { background: #0f172a; padding: 12px; border: 1px solid #1e293b; border-radius: 8px; margin-top: 12px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">⬅️ Back to Hub</a>
+        <h2 style="color: #34d399; margin: 0 0 12px 0;">🛡️ Verify Signed Message</h2>
+        
+        <textarea Id="sig-input" rows="12" placeholder="Paste full block starting with -----BEGIN PGP SIGNED MESSAGE-----"></textarea>
+        <button onclick="runVerification()">Check Signature Validity</button>
+
+        <div Id="output-box" style="display:none;">
+            <h3>Extracted Cleartext Payload:</h3>
+            <div class="result" Id="output-text"></div>
+        </div>
+    </div>
+
+    <script>
+        async function runVerification() {
+            if (typeof openpgp === 'undefined') return alert('OpenPGP Core asset engine failed loading.');
+            try {
+                const input = document.getElementById('sig-input').value.trim();
+                const db = JSON.parse(localStorage.getItem('pgp_suite_db')) || { publicKeys: {} };
+                
+                if(!input.includes("SIGNED MESSAGE")) {
+                    return alert("Error: This screen verifies signed text payloads. To import keys, use the Manage Keyring screen instead.");
+                }
+
+                const cleartextMessage = await openpgp.readCleartextMessage({ cleartextMessage: input });
+                const signers = cleartextMessage.getSigningKeyIDs().map(Id => Id.toHex().toUpperCase());
+                
+                let matchingPubKeyArmor = null;
+                for (let Id of signers) {
+                    if (db.publicKeys[Id]) {
+                        matchingPubKeyArmor = db.publicKeys[Id].armored;
+                        break;
+                    }
+                }
+
+                if (!matchingPubKeyArmor) {
+                    return alert(`Missing Key: Message signed by Key ID 0x${signers[0]}. Go back to the Keyring screen and import this user's Public Key block first.`);
+                }
+
+                const pubKeyObj = await openpgp.readKey({ armoredKey: matchingPubKeyArmor });
+                const result = await openpgp.verify({
+                    message: cleartextMessage,
+                    verificationKeys: pubKeyObj
+                });
+
+                await result.signatures[0].verified;
+                alert("✅ SUCCESS: Cryptographic signature checks out valid!");
+                document.getElementById('output-box').style.display = "block";
+                document.getElementById('output-text').innerText = cleartextMessage.getText();
+            } catch(e) { alert("❌ Verification Failed: " + e.message); }
+        }
+    </script>
+</body>
+</html>
+
