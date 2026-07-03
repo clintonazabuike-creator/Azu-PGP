@@ -8,33 +8,34 @@
         body { background-color: #020617; color: #f3f4f6; font-family: sans-serif; padding: 16px; }
         .container { max-width: 450px; margin: 0 auto; }
         .box { background: #0f172a; border: 1px solid #1e293b; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
-        textarea, input { wIdth: 100%; background: #020617; border: 1px solid #1e293b; padding: 8px; color: #34d399; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
-        button { wIdth: 100%; background: #059669; color: #020617; padding: 10px; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 8px; }
+        textarea, input { width: 100%; background: #020617; border: 1px solid #1e293b; padding: 8px; color: #34d399; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+        button { width: 100%; background: #059669; color: #020617; padding: 10px; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 8px; }
         .back-btn { display: inline-block; color: #94a3b8; text-decoration: none; font-size: 14px; margin-bottom: 12px; }
         .key-item { border-top: 1px solid #1e293b; padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; font-size: 12px; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/openpgp/5.11.2/openpgp.min.js"></script>
+    
+    <script src="https://unpkg.com/openpgp@5.11.2/dist/openpgp.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="back-btn">⬅️ Back to Hub</a>
+        <a href="./index.html" class="back-btn">⬅️ Back to Hub</a>
         <h2 style="color: #34d399; margin: 0 0 16px 0;">⚙️ Keyring Management</h2>
 
         <div class="box">
             <h3>Generate Key Pair</h3>
-            <input type="text" Id="gen-name" value="Anon User" placeholder="Identity Label"><br><br>
+            <input type="text" id="gen-name" value="Anon User" placeholder="Identity Label"><br><br>
             <button onclick="generateKeys()">Generate 2048-bit RSA Pair</button>
         </div>
 
         <div class="box">
             <h3>Import PGP Key Block</h3>
-            <textarea Id="import-input" rows="5" placeholder="Paste Armored Key Block Here..."></textarea>
+            <textarea id="import-input" rows="5" placeholder="Paste Armored Key Block Here..."></textarea>
             <button onclick="importKeyBlock()" style="background:#334155; color:white;">Parse & Save Key</button>
         </div>
 
         <div class="box">
             <h3>Stored Database Keys</h3>
-            <div Id="keyring-list"></div>
+            <div id="keyring-list"></div>
         </div>
     </div>
 
@@ -55,12 +56,12 @@
                     type: 'rsa', rsaBits: 2048, userIDs: [{ name: name }]
                 });
                 const keyObj = await openpgp.readKey({ armoredKey: publicKey });
-                const Id = keyObj.getKeyID().toHex().toUpperCase();
+                const id = keyObj.getKeyID().toHex().toUpperCase();
                 
-                db.publicKeys[Id] = { armored: publicKey, label: name + " (Public)" };
-                db.privateKeys[Id] = { armored: privateKey, label: name + " (Private)" };
+                db.publicKeys[id] = { armored: publicKey, label: name + " (Public)" };
+                db.privateKeys[id] = { armored: privateKey, label: name + " (Private)" };
                 save();
-                alert('Key pair saved: 0x' + Id);
+                alert('Key pair saved: 0x' + id);
             } catch(e) { alert(e.message); }
         }
 
@@ -69,14 +70,14 @@
                 const raw = document.getElementById('import-input').value.trim();
                 if(raw.includes('PUBLIC KEY BLOCK')) {
                     const key = await openpgp.readKey({ armoredKey: raw });
-                    const Id = key.getKeyID().toHex().toUpperCase();
-                    db.publicKeys[Id] = { armored: raw, label: "Imported Public Key" };
-                    save(); alert('Saved Public Key 0x' + Id);
+                    const id = key.getKeyID().toHex().toUpperCase();
+                    db.publicKeys[id] = { armored: raw, label: "Imported Public Key" };
+                    save(); alert('Saved Public Key 0x' + id);
                 } else if(raw.includes('PRIVATE KEY BLOCK')) {
                     const key = await openpgp.readPrivateKey({ armoredKey: raw });
-                    const Id = key.getKeyID().toHex().toUpperCase();
-                    db.privateKeys[Id] = { armored: raw, label: "Imported Private Key" };
-                    save(); alert('Saved Private Key 0x' + Id);
+                    const id = key.getKeyID().toHex().toUpperCase();
+                    db.privateKeys[id] = { armored: raw, label: "Imported Private Key" };
+                    save(); alert('Saved Private Key 0x' + id);
                 } else { alert('Invalid PGP key marker formats'); }
             } catch(e) { alert(e.message); }
         }
@@ -85,10 +86,10 @@
             const list = document.getElementById('keyring-list');
             list.innerHTML = '';
             const outputRows = (obj, type) => {
-                Object.keys(obj).forEach(Id => {
+                Object.keys(obj).forEach(id => {
                     list.innerHTML += `<div class="key-item">
-                        <div><b>${obj[Id].label}</b><br><span style="color:#64748b; font-family:monospace;">0x${Id} (${type})</span></div>
-                        <button onclick="deleteKey('${Id}','${type}')" style="wIdth:auto; background:transparent; color:#f87171; padding:0; margin:0;">Delete</button>
+                        <div><b>${obj[id].label}</b><br><span style="color:#64748b; font-family:monospace;">0x${id} (${type})</span></div>
+                        <button onclick="deleteKey('${id}','${type}')" style="width:auto; background:transparent; color:#f87171; padding:0; margin:0;">Delete</button>
                     </div>`;
                 });
             };
@@ -96,10 +97,10 @@
             outputRows(db.publicKeys, 'public');
         }
         
-        function deleteKey(Id, type) {
+        function deleteKey(id, type) {
             if(confirm("Delete this key?")) {
-                if(type === 'public') delete db.publicKeys[Id];
-                if(type === 'private') delete db.privateKeys[Id];
+                if(type === 'public') delete db.publicKeys[id];
+                if(type === 'private') delete db.privateKeys[id];
                 save();
             }
         }
@@ -107,4 +108,3 @@
     </script>
 </body>
 </html>
-
