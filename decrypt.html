@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PGP Suite - Decrypt Payloads</title>
+    <style>
+        body { background-color: #020617; color: #f3f4f6; font-family: sans-serif; padding: 16px; margin: 0; }
+        .container { max-width: 450px; margin: 20px auto; }
+        .box { background: #0f172a; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 16px; }
+        textarea, input { width: 100%; background: #020617; border: 1px solid #1e293b; padding: 12px; color: #34d399; border-radius: 8px; box-sizing: border-box; font-family: monospace; font-size: 13px; margin-bottom: 14px; outline: none; }
+        textarea:focus, input:focus { border-color: #059669; }
+        label { font-family: monospace; font-size: 11px; color: #64748b; display: block; margin-bottom: 6px; font-weight: bold; }
+        button { width: 100%; background: #059669; color: #020617; padding: 12px; border: none; font-weight: bold; border-radius: 8px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        button:hover { background: #10b981; }
+        .back-btn { display: inline-block; color: #94a3b8; text-decoration: none; font-size: 14px; margin-bottom: 16px; font-weight: 500; }
+        .back-btn:hover { color: #34d399; }
+        .result-box { display: none; background: #020617; border: 1px solid #059669; padding: 14px; border-radius: 8px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #e2e8f0; font-size: 13px; line-height: 1.5; }
+    </style>
+    <script src="https://unpkg.com/openpgp@5.11.2/dist/openpgp.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="./index.html" class="back-btn">⬅️ Back to Dashboard</a>
+        
+        <div class="box">
+            <h2 style="color: #34d399; margin: 0 0 4px 0;">🔓 Decrypt PGP Payload</h2>
+            <p style="color: #64748b; font-size: 12px; margin: 0 0 20px 0;">Extract raw message data using your local private keys.</p>
+            
+            <label>ENCRYPTED PGP MESSAGE BLOCK:</label>
+            <textarea id="decrypt-input" rows="8" placeholder="Paste encrypted payload starting with -----BEGIN PGP MESSAGE-----"></textarea>
+            
+            <label>KEY PASSPHRASE (IF CHOSEN DURING GENERATION):</label>
+            <input type="password" id="decrypt-passphrase" placeholder="Leave blank if no password was set">
+            
+            <button onclick="handleDecryption()">Decrypt Payload</button>
+        </div>
+
+        <div id="result-wrapper" class="box" style="display: none;">
+            <h3 style="color: #34d399; margin: 0 0 10px 0; font-size: 14px;">🟢 Decrypted Content Output:</h3>
+            <div id="decrypt-output-text" class="result-box"></div>
+        </div>
+    </div>
+
+    <script>
+        async function handleDecryption() {
+            if (typeof openpgp === 'undefined') {
+                return alert('⚠️ Cryptographic compilation core engine failed to load.');
+            }
+            
+            const input = document.getElementById('decrypt-input').value.trim();
+            const pass = document.getElementById('decrypt-passphrase').value;
+            const resWrapper = document.getElementById('result-wrapper');
+            const resBox = document.getElementById('decrypt-output-text');
+            
+            resWrapper.style.display = "none";
+            resBox.style.display = "none";
+
+            if (!input.includes('-----BEGIN PGP MESSAGE-----')) {
+                return alert('❌ Formatting Error: Input text does not contain a standard PGP encrypted message marker block.');
+            }
+
+            try {
+                // Instantly sync database states across isolated page pipes via LocalStorage pipeline
+                const db = JSON.parse(localStorage.getItem('pgp_suite_db')) || { privateKeys: {} };
+                const message = await openpgp.readMessage({ armoredMessage: input });
+                const encryptionIds = message.getEncryptionKeyIDs().map(id => id.toHex().toUpperCase());
+
+                let localPrivateKeyArmor = null;
+                for (let id of encryptionIds) {
+                    if (db.privateKeys[id]) {
+                        localPrivateKeyArmor = db.privateKeys[id].armored;
+                        break;
+                    }
+                }
+
+                if (!localPrivateKeyArmor) {
+                    return alert(`🔑 Private Key Missing: This text was encrypted for Key ID 0x${encryptionIds[0] || 'Unknown'}. You do not have the corresponding private key in your storage database.`);
+                }
+
+                let privateKeyObj = await openpgp.readPrivateKey({ armoredKey: localPrivateKeyArmor });
+
+                if (privateKeyObj.isEncrypted()) {
+                    try {
+                        privateKeyObj = await openpgp.decryptKey({ privateKey: privateKeyObj, passphrase: pass });
+                    } catch(err) {
+                        return alert('❌ Invalid Passphrase: The password entered does not unlock this private key.');
+                    }
+                }
+
+                const { data: decrypted } = await openpgp.decrypt({
+                    message,
+                    decryptionKeys: privateKeyObj
+                });
+
+                resWrapper.style.display = "block";
+                resBox.style.display = "block";
+                resBox.innerText = decrypted;
+                
+            } catch(e) {
+                alert(`❌ Decryption Failed: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html>
+
